@@ -3,6 +3,7 @@ package strutil
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/jopbrown/gobase/errors"
@@ -17,7 +18,12 @@ var globalExpandHandle struct {
 }
 
 func init() {
-	// RegisterExpandHandler(os.LookupEnv)
+	RegisterExpandHandler(func(s string) (string, bool) {
+		if strings.HasPrefix(s, "env.") {
+			return os.Getenv(strings.TrimPrefix(s, "env.")), true
+		}
+		return s, false
+	})
 }
 
 func RegisterExpandHandler(h ExpandHandler) {
@@ -71,7 +77,7 @@ func expandByHandlers(key string, handles ...ExpandHandler) (string, bool) {
 		}
 	}
 
-	return "", false
+	return "${" + key + "}", false
 }
 
 func (expander Expander) MarshalYAML() (interface{}, error) {
