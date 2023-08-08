@@ -22,7 +22,7 @@ func ExampleJoin() {
 	err456 := errors.Join(err4, err5, err6)
 	err = errors.Join(err, err456, err7, err8)
 
-	showErr(err)
+	trimErr(err)
 
 	// Output:
 	// 1. EOF

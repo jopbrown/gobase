@@ -3,22 +3,22 @@ package errors_test
 import (
 	"fmt"
 	"io"
+	"path"
+	"runtime"
+	"strings"
 
 	"github.com/jopbrown/gobase/errors"
 )
 
-func showErr(err error) {
-	// fmt.Print(err)
-	// fmt.Printf("%s", err)
-	// fmt.Printf("%q", err)
-	// fmt.Printf("%v", err)
-	fmt.Printf("%+v", err)
-	// fmt.Printf("%+2v", err)
+func trimErr(err error) {
+	_, fpath, _, _ := runtime.Caller(0)
+	dir := path.Dir(fpath)
+	fmt.Print(strings.ReplaceAll(errors.GetErrorDetails(err), dir, "github.com/jopbrown/gobase/errors"))
 }
 
 func ExampleError() {
 	err := errors.Error("the error:", "unable to got resource")
-	showErr(err)
+	trimErr(err)
 
 	// Output:
 	// * the error:unable to got resource
@@ -27,7 +27,7 @@ func ExampleError() {
 
 func ExampleErrorOmit() {
 	err := errors.Error()
-	showErr(err)
+	trimErr(err)
 
 	// Output:
 	// * something is wrong
@@ -36,7 +36,7 @@ func ExampleErrorOmit() {
 
 func ExampleErrorf() {
 	err := errors.Errorf("the error:%s", "unable to got resource")
-	showErr(err)
+	trimErr(err)
 
 	// Output:
 	// * the error:unable to got resource
@@ -45,7 +45,7 @@ func ExampleErrorf() {
 
 func ExampleErrorAt() {
 	err := errors.ErrorAt(io.EOF, "the error:", "unable to got resource")
-	showErr(err)
+	trimErr(err)
 
 	// Output:
 	// * EOF
@@ -58,7 +58,7 @@ func ExampleErrorAt2() {
 	err = errors.ErrorAt(err, "2nd layer error")
 	err = errors.ErrorAt(err, "3rd layer error")
 	err = errors.ErrorAt(err, "4th layer error")
-	showErr(err)
+	trimErr(err)
 
 	// Output:
 	// * EOF
@@ -77,7 +77,7 @@ func ExampleErrorAtOmit() {
 	err = errors.ErrorAt(err)
 	err = errors.ErrorAt(err)
 	err = errors.ErrorAt(err)
-	showErr(err)
+	trimErr(err)
 
 	// Output:
 	// * EOF
@@ -96,7 +96,7 @@ func ExampleErrorAtf() {
 	for i := 0; i < 4; i++ {
 		err = errors.ErrorAtf(err, "%d err", i+1)
 	}
-	showErr(err)
+	trimErr(err)
 
 	// Output:
 	// * EOF

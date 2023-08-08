@@ -11,8 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"log/slog"
+
 	"github.com/jopbrown/gobase/errors"
-	"golang.org/x/exp/slog"
 )
 
 type Logger struct {

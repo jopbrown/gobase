@@ -1,6 +1,6 @@
 module github.com/jopbrown/gobase
 
-go 1.20
+go 1.21
 
 require (
 	github.com/djherbis/times v1.5.0

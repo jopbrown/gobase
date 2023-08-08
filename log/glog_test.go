@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"log/slog"
+
 	"github.com/jopbrown/gobase/log"
-	"golang.org/x/exp/slog"
 )
 
 func ExamplePrint() {

@@ -3,8 +3,9 @@ package log
 import (
 	"strconv"
 
+	"log/slog"
+
 	"github.com/jopbrown/gobase/errors"
-	"golang.org/x/exp/slog"
 )
 
 type Level slog.Level

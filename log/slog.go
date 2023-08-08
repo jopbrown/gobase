@@ -3,8 +3,9 @@ package log
 import (
 	"context"
 
+	"log/slog"
+
 	"github.com/jopbrown/gobase/errors"
-	"golang.org/x/exp/slog"
 )
 
 type sLoggerHandler struct {
@@ -13,7 +14,7 @@ type sLoggerHandler struct {
 }
 
 func newSLoggerHandler(l *Logger, json bool) *sLoggerHandler {
-	opts := slog.HandlerOptions{
+	opts := &slog.HandlerOptions{
 		AddSource: l.format.AddSource,
 		Level:     l.minLevel,
 	}
@@ -27,9 +28,9 @@ func newSLoggerHandler(l *Logger, json bool) *sLoggerHandler {
 	}
 	var h slog.Handler
 	if json {
-		h = opts.NewJSONHandler(l.out)
+		h = slog.NewJSONHandler(l.out, opts)
 	} else {
-		h = opts.NewTextHandler(l.out)
+		h = slog.NewTextHandler(l.out, opts)
 	}
 
 	attrs := make([]slog.Attr, 0, 2)
