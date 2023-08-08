@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jopbrown/gobase/errors"
 	"github.com/jopbrown/gobase/log/rotate"
-	"github.com/jopbrown/gobase/must"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,9 +32,9 @@ func TestOpenFile(t *testing.T) {
 	fmt.Fprintf(w, "eee")
 	fmt.Fprintf(w, "fff")
 
-	assert.Equal(t, "aaabbbccc", string(must.Value(os.ReadFile(must.Value(filepath.Glob("tmp/*_01.log"))[0]))))
-	assert.Equal(t, "dddeee", string(must.Value(os.ReadFile(must.Value(filepath.Glob("tmp/*_02.log"))[0]))))
-	assert.Equal(t, "fff", string(must.Value(os.ReadFile("tmp/test.log"))))
+	assert.Equal(t, "aaabbbccc", string(errors.Must1(os.ReadFile(errors.Must1(filepath.Glob("tmp/*_01.log"))[0]))))
+	assert.Equal(t, "dddeee", string(errors.Must1(os.ReadFile(errors.Must1(filepath.Glob("tmp/*_02.log"))[0]))))
+	assert.Equal(t, "fff", string(errors.Must1(os.ReadFile("tmp/test.log"))))
 
 	w.Close()
 }

@@ -6,12 +6,11 @@ import (
 	"path/filepath"
 
 	"github.com/jopbrown/gobase/errors"
-	"github.com/jopbrown/gobase/must"
 	"github.com/jopbrown/gobase/strutil"
 )
 
 func AppDir() string {
-	exePath := must.Value(os.Executable())
+	exePath := errors.Must1(os.Executable())
 	return filepath.Dir(exePath)
 }
 

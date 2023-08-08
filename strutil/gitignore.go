@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/jopbrown/gobase/errors"
-	"github.com/jopbrown/gobase/must"
 )
 
 type GitIgnoreMatcher struct {
@@ -153,7 +152,7 @@ func CompileGitIgnore(line string) (*GitIgnoreMatcher, error) {
 }
 
 func MustCompileGitIgnore(line string) *GitIgnoreMatcher {
-	return must.Value(CompileGitIgnore(line))
+	return errors.Must1(CompileGitIgnore(line))
 }
 
 func CompileGitIgnoreLines(lines ...string) (MultiMatcher, error) {

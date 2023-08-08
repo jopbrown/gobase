@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jopbrown/gobase/must"
+	"github.com/jopbrown/gobase/errors"
 )
 
 func ComplieGlob(pattern string) (*regexp.Regexp, error) {
@@ -16,7 +16,7 @@ func ComplieGlob(pattern string) (*regexp.Regexp, error) {
 }
 
 func MustComplieGlob(pattern string) *regexp.Regexp {
-	return must.Value(ComplieGlob(pattern))
+	return errors.Must1(ComplieGlob(pattern))
 }
 
 func replaceGlobRule(expr, replace, placehold, pattern string) string {

@@ -9,7 +9,6 @@ import (
 	"github.com/djherbis/times"
 	"github.com/jopbrown/gobase/errors"
 	"github.com/jopbrown/gobase/fsutil"
-	"github.com/jopbrown/gobase/must"
 )
 
 type Writer struct {
@@ -39,7 +38,7 @@ func NewWriter(fd *os.File, interval time.Duration, maxSize int64) *Writer {
 	w.interval = interval
 	w.maxSize = maxSize
 	w.fd = fd
-	finfo := must.Value(fd.Stat())
+	finfo := errors.Must1(fd.Stat())
 	w.written = finfo.Size()
 	w.perm = finfo.Mode().Perm()
 	w.fpath = fd.Name()
@@ -49,7 +48,7 @@ func NewWriter(fd *os.File, interval time.Duration, maxSize int64) *Writer {
 }
 
 func getCreateTime(fd *os.File) time.Time {
-	stat := must.Value(times.StatFile(fd))
+	stat := errors.Must1(times.StatFile(fd))
 	if stat.HasBirthTime() {
 		return stat.BirthTime()
 	}
