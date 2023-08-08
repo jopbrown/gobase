@@ -1,5 +1,5 @@
-//go:build go1.13
-// +build go1.13
+//go:build go1.18
+// +build go1.18
 
 package errors_test
 
@@ -47,4 +47,13 @@ func TestAs(t *testing.T) {
 	var err2 CustomError2
 	assert.True(t, errors.As(err, &err2))
 	assert.Equal(t, "err2", err2.Error())
+
+	var ok bool
+	err1, ok = errors.AsIs[CustomError1](err)
+	assert.True(t, ok)
+	assert.Equal(t, "err1", err1.Error())
+
+	err2, ok = errors.AsIs[CustomError2](err)
+	assert.True(t, ok)
+	assert.Equal(t, "err1", err1.Error())
 }
