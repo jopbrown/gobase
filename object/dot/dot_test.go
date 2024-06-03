@@ -14,6 +14,7 @@ var data = []byte(`{
 	"name": "service",
 	"ppm": 0.55,
 	"qos": 1,
+	"numarr": [1, 2, 3],
 	"batters":
 		{
 			"batter":
@@ -54,8 +55,12 @@ func TestGet_Map(t *testing.T) {
 
 	assert.Equal(t, "Jackal", dot.Get[string](mdata, "topping[5].type"))
 
-	topping := dot.Get[[]any](mdata, "topping")
-	assert.Equal(t, "8102", dot.Get[string](topping[1], "id"))
+	topping := dot.Get[any](mdata, "topping")
+	dot.Set(topping, "[1].id", "9999")
+	assert.Equal(t, "9999", dot.Get[string](topping, "[1].id"))
+
+	dot.Set(mdata, "numarr[1]", 9.9)
+	assert.Equal(t, 9.9, dot.Get[float64](mdata, "numarr[1]"))
 }
 
 func TestGet_Struct(t *testing.T) {
@@ -79,6 +84,7 @@ func TestGet_Struct(t *testing.T) {
 		Name    string     `json:"name"`
 		Ppm     float64    `json:"ppm"`
 		Qos     int        `json:"qos"`
+		NumArr  []int      `json:"numarr"`
 		Batters Batters    `json:"batters"`
 		Topping []*Topping `json:"topping"`
 	}
@@ -100,6 +106,10 @@ func TestGet_Struct(t *testing.T) {
 
 	assert.Equal(t, "Jackal", dot.Get[string](mdata, "topping[5].type"))
 
-	topping := dot.Get[[]*Topping](mdata, "topping")
-	assert.Equal(t, "8102", dot.Get[string](topping[1], "id"))
+	topping := dot.Get[any](mdata, "topping")
+	dot.Set(topping, "[1].id", "9999")
+	assert.Equal(t, "9999", mdata.Topping[1].ID)
+
+	dot.Set(mdata, "numarr[1]", 9)
+	assert.Equal(t, 9, mdata.NumArr[1])
 }

@@ -36,7 +36,11 @@ func ErrorAtf(err error, format string, a ...any) error {
 func WithStack(err error, callDepth int, msg string) error {
 	werr := &stackErr{}
 	if len(msg) == 0 {
-		msg = defaultOmmittedErrMessage
+		if err != nil {
+			msg = err.Error()
+		} else {
+			msg = defaultOmmittedErrMessage
+		}
 	}
 	werr.msg = msg
 	werr.stack = getStack(callDepth)

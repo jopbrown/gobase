@@ -1,6 +1,7 @@
 package dot
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -25,23 +26,12 @@ func GetWithTag[V any](input any, key string, tagName string) V {
 
 func TryGetWithTag[V any](input any, key, tagName string) (V, error) {
 	var none V
-	keyPath := strings.Split(key, ".")
-	value := reflect.ValueOf(input)
-	k := value.Kind()
-	if k == reflect.Ptr {
-		value = value.Elem()
-	}
-	k = value.Kind()
-	if k != reflect.Struct && k != reflect.Map {
-		return none, errors.Errorf("only support map and struct, but got `%s`", k)
-	}
-
-	ret, err := deepGet(value, tagName, keyPath)
+	fields, err := fetchFields(key, input, tagName)
 	if err != nil {
 		return none, errors.ErrorAt(err)
 	}
 
-	i := ret.Interface()
+	i := fields[len(fields)-1].Inner.Interface()
 	v, ok := i.(V)
 	if !ok {
 		return none, errors.Errorf("`%s` is not the type of `%T` but got `%T`", key, none, i)
@@ -50,69 +40,135 @@ func TryGetWithTag[V any](input any, key, tagName string) (V, error) {
 	return v, nil
 }
 
-func deepGet(value reflect.Value, tagName string, keyPath []string) (reflect.Value, error) {
-	name := keyPath[0]
-	arrName, arrlDX, isArrayNotation := deepGetArray(keyPath[0])
+func Set[V any](input any, key string, v V) {
+	SetWithTag[V](input, key, "json", v)
+}
 
-	if isArrayNotation {
-		name = arrName
-	}
+func TrySet[V any](input any, key string, v V) error {
+	return TrySetWithTag[V](input, key, "json", v)
+}
 
-	innerVal, err := getField(value, name, tagName)
+func SetWithTag[V any](input any, key string, tagName string, v V) {
+	errors.Must(TrySetWithTag[V](input, key, tagName, v))
+}
+
+func TrySetWithTag[V any](input any, key, tagName string, v V) error {
+	fields, err := fetchFields(key, input, tagName)
 	if err != nil {
-		return reflect.Value{}, errors.ErrorAt(err)
-	}
-	inner := reflect.ValueOf(innerVal)
-
-	if isArrayNotation {
-		if k := inner.Kind(); k != reflect.Array && k != reflect.Slice {
-			return reflect.Value{}, errors.Errorf("the field is not array or slice: %s", name)
-		}
-		if arrlDX < 0 || inner.Len() <= arrlDX {
-			return reflect.Value{}, errors.Errorf("access array out of range(len=%d): %d", inner.Len(), arrlDX)
-		}
-		inner = inner.Index(arrlDX)
-	}
-	if len(keyPath) == 1 {
-		return inner, nil
+		return errors.ErrorAt(err)
 	}
 
-	return deepGet(inner, tagName, keyPath[1:])
+	parent, child := fields[len(fields)-2], fields[len(fields)-1]
+	pv, pk := parent.Inner, parent.Inner.Kind()
+	if pk == reflect.Map {
+		iter := pv.MapRange()
+		for iter.Next() {
+			if iter.Key().String() == child.Name {
+				pv.SetMapIndex(iter.Key(), reflect.ValueOf(v))
+				break
+			}
+		}
+		return nil
+	}
+
+	if pk == reflect.Slice || pk == reflect.Array {
+		err = setFieldValue(child.Outter, v)
+		if err != nil {
+			return errors.ErrorAt(err)
+		}
+		return nil
+	}
+
+	err = setFieldValue(child.Inner, v)
+	if err != nil {
+		return errors.ErrorAt(err)
+	}
+
+	return nil
 }
 
-func getField(value reflect.Value, name, tagName string) (any, error) {
-	k := value.Kind()
+type reflectField struct {
+	Name   string
+	Outter reflect.Value
+	Inner  reflect.Value
+}
+
+func fetchFields(key string, input any, tagName string) ([]*reflectField, error) {
+	keyElems := splitKey(key)
+	rv := reflect.ValueOf(input)
+	rv = getInnerElem(rv)
+
+	k := rv.Kind()
+	if k != reflect.Struct && k != reflect.Map && k != reflect.Array && k != reflect.Slice {
+		return nil, errors.Errorf("top level only support map, struct, array and slice, but got `%s`", k)
+	}
+
+	fields, err := fetchElemFields(rv, tagName, keyElems)
+	if err != nil {
+		return nil, errors.ErrorAt(err)
+	}
+
+	return fields, nil
+}
+
+func fetchElemFields(rv reflect.Value, tagName string, keyElems []string) ([]*reflectField, error) {
+	fields := make([]*reflectField, 0, len(keyElems)+1)
+	fields = append(fields, &reflectField{Name: "", Outter: rv, Inner: getInnerElem(rv)})
+	for i, keyElem := range keyElems {
+		outter, inner, err := findField(rv, keyElem, tagName)
+		if err != nil {
+			return nil, errors.ErrorAtf(err, "unable to fetch field: %s", strings.Join(keyElems[:i+1], ""))
+		}
+		fields = append(fields, &reflectField{Name: keyElem, Outter: outter, Inner: inner})
+		rv = inner
+	}
+
+	return fields, nil
+}
+
+func findField(rv reflect.Value, name, tagName string) (reflect.Value, reflect.Value, error) {
+	k := rv.Kind()
 	switch k {
-	case reflect.Struct, reflect.Ptr:
-		return getStructField(value, name, tagName)
+	case reflect.Struct:
+		return findStructField(rv, name, tagName)
 	case reflect.Map:
-		return getMapField(value, name)
-	case reflect.Interface:
-		return getField(value.Elem(), name, tagName)
+		return findMapField(rv, name)
+	case reflect.Array, reflect.Slice:
+		return findArrayField(rv, name)
 	default:
-		return reflect.Value{}, errors.Errorf("parent's kind not of supported to get `%s`: %v", k, name)
+		return reflect.Value{}, reflect.Value{}, errors.Errorf("parent's kind not of supported to get `%s`: %v", k, name)
 	}
 }
 
-func getMapField(value reflect.Value, name string) (any, error) {
-	iter := value.MapRange()
+func findArrayField(rv reflect.Value, name string) (reflect.Value, reflect.Value, error) {
+	idx := -1
+	if n, _ := fmt.Sscanf(name, "[%d]", &idx); n != 1 {
+		return reflect.Value{}, reflect.Value{}, errors.Errorf("the key is notarray notation: %s", name)
+	}
+	if idx < 0 || rv.Len() <= idx {
+		return reflect.Value{}, reflect.Value{}, errors.Errorf("access array out of range(len=%d): %d", rv.Len(), idx)
+	}
+	v := rv.Index(idx)
+	return v, getInnerElem(v), nil
+}
+
+func findMapField(rv reflect.Value, name string) (reflect.Value, reflect.Value, error) {
+	iter := rv.MapRange()
 	for iter.Next() {
 		key := iter.Key()
 		if key.String() == name {
-			return iter.Value().Interface(), nil
+			v := iter.Value()
+			return v, getInnerElem(v), nil
 		}
 	}
 
-	return nil, errors.Errorf("map key not found: %s", name)
+	return reflect.Value{}, reflect.Value{}, errors.Errorf("map key not found: %s", name)
 }
 
-func getStructField(value reflect.Value, name, tagName string) (any, error) {
-	if value.Kind() == reflect.Ptr {
-		value = value.Elem()
-	}
-	t := value.Type()
+func findStructField(rv reflect.Value, name, tagName string) (reflect.Value, reflect.Value, error) {
+	t := rv.Type()
 
-	for i := 0; i < value.NumField(); i++ {
+	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		var fieldName string
 
@@ -124,16 +180,46 @@ func getStructField(value reflect.Value, name, tagName string) (any, error) {
 		}
 
 		if fieldName == name {
-			return value.Field(i).Interface(), nil
+			v := rv.Field(i)
+			return v, getInnerElem(v), nil
 		}
 	}
-	return reflect.Value{}, errors.Errorf("struct field not found: %s", name)
+	return reflect.Value{}, reflect.Value{}, errors.Errorf("struct field not found: %s", name)
 }
 
-var pattArrayNotation = regexp.MustCompile(`^(\w+)\[(-?\d+)\]$`)
+func setFieldValue(rv reflect.Value, v any) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Error(r)
+		}
+	}()
 
-func deepGetArray(key string) (string, int, bool) {
-	match := pattArrayNotation.FindStringSubmatch(key)
+	rv.Set(reflect.ValueOf(v))
+	return
+}
+
+func splitKey(key string) []string {
+	dotSplitKeyElems := strings.Split(key, ".")
+	keyElems := make([]string, 0, len(dotSplitKeyElems)+3)
+	for _, dotkey := range dotSplitKeyElems {
+		name, idx, ok := parseArrayElem(dotkey)
+		if ok {
+			if name != "" {
+				keyElems = append(keyElems, name)
+			}
+			keyElems = append(keyElems, fmt.Sprintf("[%d]", idx))
+		} else {
+			keyElems = append(keyElems, dotkey)
+		}
+	}
+
+	return keyElems
+}
+
+var pattArrayNotation = regexp.MustCompile(`^(\w+)?\[(-?\d+)\]$`)
+
+func parseArrayElem(keyElem string) (string, int, bool) {
+	match := pattArrayNotation.FindStringSubmatch(keyElem)
 	if len(match) == 0 {
 		return "", 0, false
 	}
@@ -145,4 +231,13 @@ func deepGetArray(key string) (string, int, bool) {
 		return "", 0, false
 	}
 	return name, index, true
+}
+
+func getInnerElem(rv reflect.Value) reflect.Value {
+	k := rv.Kind()
+	if k == reflect.Ptr || k == reflect.Interface {
+		return getInnerElem(rv.Elem())
+	}
+
+	return rv
 }
